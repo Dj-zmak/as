@@ -1,20 +1,23 @@
-FROM node:18-buster
+FROM ubuntu:22.04
 
-# প্রয়োজনীয় সিস্টেম টুলস ইনস্টল
+# প্রয়োজনীয় প্যাকেজ ইনস্টল
 RUN apt-get update && apt-get install -y \
-    python3 \
+    curl \
     make \
     g++ \
+    python3 \
     neofetch \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# প্রথমে প্যাকেজ লিস্ট কপি করে ইনস্টল করা
+# প্যাকেজ ইনস্টল
 COPY package.json ./
 RUN npm install
 
-# বাকি সব ফাইল কপি করা
+# সব ফাইল কপি
 COPY . .
 
 EXPOSE 8080
