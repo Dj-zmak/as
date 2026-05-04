@@ -4,91 +4,113 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Arafat Pro Termux</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css" />
     <style>
-        :root { --neon: #00ff88; --bg: #000000; }
-        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); overflow: hidden; font-family: 'Courier New', monospace; }
-        
-        #terminal-container { height: calc(100% - 60px); width: 100%; }
+        :root {
+            --neon: #00ff88;
+            --bg: #000000;
+            --panel: #111111;
+        }
 
-        /* Termux Style Toolbar */
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            background-color: var(--bg);
+            font-family: 'Courier New', monospace;
+            overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        /* Terminal Container */
+        #terminal {
+            flex-grow: 1;
+            width: 100%;
+            background: var(--bg);
+        }
+
+        /* Professional Mobile Toolbar */
         .toolbar {
-            height: 60px; background: #111; display: flex; 
-            align-items: center; justify-content: center; gap: 5px;
-            border-top: 1px solid #333; padding: 0 5px;
+            height: 60px;
+            background: var(--panel);
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 0 5px;
+            border-top: 1px solid #333;
+            gap: 4px;
         }
 
         .t-btn {
-            background: #222; color: var(--neon); border: 1px solid #444;
-            padding: 10px 8px; border-radius: 5px; font-size: 11px;
-            font-weight: bold; flex: 1; text-align: center;
+            background: #222;
+            color: var(--neon);
+            border: 1px solid #444;
+            padding: 10px 2px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
         }
 
-        .t-btn:active { background: var(--neon); color: #000; }
-        
-        /* Paste Button Special Style */
-        .paste-btn { border-color: var(--neon); box-shadow: 0 0 5px var(--neon); }
+        .t-btn:active {
+            background: var(--neon);
+            color: #000;
+            transform: scale(0.95);
+        }
+
+        .btn-paste {
+            border: 1px solid var(--neon);
+            box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+        }
+
+        /* Hide ttyd default header elements if any */
+        .ttyd-header { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div id="terminal-container"></div>
-    
+    <div id="terminal"></div>
+
     <div class="toolbar">
-        <button class="t-btn" onclick="sendCtrl('C')">ESC</button>
+        <button class="t-btn" onclick="sendChar('\x1b')">ESC</button>
         <button class="t-btn" onclick="sendCtrl('C')">CTRL+C</button>
-        <button class="t-btn" onclick="sendKey('\t')">TAB</button>
-        <button class="t-btn" onclick="sendKey('/')">/</button>
-        <button class="t-btn" onclick="sendKey('-')">-</button>
-        <button class="t-btn paste-btn" onclick="pasteClipboard()">PASTE</button>
-        <button class="t-btn" onclick="sendKey('\x1b[A')">UP</button>
+        <button class="t-btn" onclick="sendChar('\t')">TAB</button>
+        <button class="t-btn" onclick="sendChar('/')">/</button>
+        <button class="t-btn" onclick="sendChar('-')">-</button>
+        <button class="t-btn btn-paste" onclick="doPaste()">PASTE</button>
+        <button class="t-btn" onclick="sendChar('\x1b[A')">UP</button>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-
+    <script src="client-bundle.js"></script>
     <script>
-        const socket = io();
-        const term = new Terminal({
-            cursorBlink: true,
-            theme: { background: '#000000', foreground: '#00ff88' },
-            fontSize: 13,
-            convertEol: true, // কোড পেস্ট বাগ ফিক্স
-            scrollback: 1000,
-            allowProposedApi: true
-        });
-
-        const fitAddon = new TerminalAddonFit.FitAddon();
-        term.loadAddon(fitAddon);
-        term.open(document.getElementById('terminal-container'));
+        // ttyd উইন্ডো অবজেক্ট থেকে টার্মিনাল কন্ট্রোল করা
+        var term;
         
-        // কিবোর্ড ওপেন হলে স্ক্রিন অ্যাডজাস্ট করা
-        setTimeout(() => fitAddon.fit(), 500);
+        // টার্মিনাল লোড হওয়ার জন্য অপেক্ষা
+        window.onload = function() {
+            // ttyd নিজে থেকেই #terminal বা বডিতে টার্মিনাল রেন্ডার করবে
+            // আমরা শুধু শর্টকাট বাটনগুলোর লজিক সেট করবো
+        };
 
-        term.onData(data => socket.emit('input', data));
-        socket.on('output', data => term.write(data));
-
-        window.addEventListener('resize', () => {
-            fitAddon.fit();
-            socket.emit('resize', { cols: term.cols, rows: term.rows });
-        });
-
-        function sendKey(key) { socket.emit('input', key); term.focus(); }
-        function sendCtrl(key) { 
-            const code = key.charCodeAt(0) - 64; 
-            socket.emit('input', String.fromCharCode(code)); 
-            term.focus(); 
+        function sendChar(char) {
+            // ttyd এর ইনপুট ইভেন্ট ট্রিগার করা
+            const event = new CustomEvent('ttyd-input', { detail: char });
+            window.dispatchEvent(event);
         }
 
-        async function pasteClipboard() {
+        function sendCtrl(key) {
+            const code = String.fromCharCode(key.charCodeAt(0) - 64);
+            sendChar(code);
+        }
+
+        async function doPaste() {
             try {
                 const text = await navigator.clipboard.readText();
-                socket.emit('input', text);
+                sendChar(text);
             } catch (err) {
-                alert("Paste permission required!");
+                console.error('Paste failed: ', err);
+                alert("Clipboard permission দিন!");
             }
-            term.focus();
         }
     </script>
 </body>
