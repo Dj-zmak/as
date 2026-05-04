@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Arafat Pro Terminal</title>
+    <style>
+        :root {
+            --neon: #00ff88;
+            --neon-dim: #00cc6a;
+            --bg: #0a0a0a;
+            --panel: #111111;
+            --surface: #1a1a1a;
+            --border: #333333;
+            --text: #e0e0e0;
+            --text-dim: #888888;
+            --danger: #ff4444;
+            --warn: #ffaa00;
+            --info: #00aaff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            height: 100%;
+            background: var(--bg);
+            font-family: 'Courier New', 'DejaVu Sans Mono', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            color: var(--text);
+        }
+
+        /* Terminal Area */
+        #terminal {
+            flex-grow: 1;
+            width: 100%;
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Drawer / Side Panel */
+        .drawer-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .drawer-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 280px;
+            height: 100%;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .drawer.active {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            padding: 20px;
+            background: linear-gradient(135deg, var(--panel), var(--surface));
+            border-bottom: 1px solid var(--border);
+        }
+        .drawer-header h2 {
+            color: var(--neon);
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        .drawer-header p {
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        .drawer-section {
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        .drawer-section h3 {
+            color: var(--text-dim);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .drawer-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 13px;
+            width: 100%;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .drawer-btn:active {
+            background: var(--neon);
+            color: #000;
+            transform: scale(0.98);
+        }
+        .drawer-btn .icon {
+            font-size: 16px;
+            width: 24px;
+            text-align: center;
+        }
+
+        /* Theme Options */
+        .theme-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .theme-btn {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .theme-btn.active {
+            border-color: var(--neon);
+            color: var(--neon);
+        }
+        .theme-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Top Status Bar */
+        .status-bar {
+            height: 28px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .hamburger {
+            width: 20px;
+            height: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+        .hamburger span {
+            height: 2px;
+            background: var(--neon);
+            border-radius: 2px;
+            transition: 0.3s;
+        }
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon);
+            box-shadow: 0 0 8px var(--neon);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Keyboard Panels */
+        .keyboard-container {
+            background: var(--panel);
+            border-top: 1px solid var(--border);
+            transition: height 0.3s;
+        }
+
+        .kb-tabs {
+            display: flex;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .kb-tabs::-webkit-scrollbar { display: none; }
+        
+        .kb-tab {
+            flex: 1;
+            min-width: 60px;
+            padding: 10px 5px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-dim);
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .kb-tab.active {
+            color: var(--neon);
+            border-bottom-color: var(--neon);
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .kb-panel {
+            display: none;
+            padding: 8px;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .kb-panel.active {
+            display: flex;
+        }
+
+        /* Keys */
+        .key {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 13px;
+            padding: 12px 14px;
+            min-width: 44px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.1s;
+            user-select: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .key:active, .key.active {
+            background: var(--neon);
+            color: #000;
+            border-color: var(--neon);
+            transform: scale(0.92);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+        }
+        .key.mod {
+            background: #222;
+            border-color: #444;
+            font-size: 11px;
+        }
+        .key.special {
+            background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+            border-color: var(--neon-dim);
+            color: var(--neon);
+            font-weight: bold;
+        }
+        .key.danger {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .key.danger:active {
+            background: var(--danger);
+            color: #fff;
+        }
+        .key.wide {
+            min-width: 80px;
+            flex: 1;
+            max-width: 120px;
+        }
+        .key-xl {
+            min-width: 100px;
+            flex: 2;
+            max-width: 160px;
+        }
+
+        /* Ripple Effect */
+        .key::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 0; height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s;
+        }
+        .key:active::after {
+            width: 100px; height: 100px;
+        }
+
+        /* Swipe hint */
+        .swipe-hint {
+            text-align: center;
+            padding: 4px;
+            font-size: 10px;
+            color: var(--text-dim);
+            background: var(--bg);
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--surface);
+            border: 1px solid var(--neon);
+            color: var(--neon);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 2000;
+            opacity: 0;
+            transition: all 0.3s;
+            pointer-events: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Floating Action Button for quick paste */
+        .fab {
+            position: fixed;
+            bottom: 220px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--neon);
+            color: #000;
+            border: none;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.4);
+            z-index: 100;
+            transition: 0.3s;
+        }
+        .fab:active {
+            transform: scale(0.9);
+            box-shadow: 0 2px 8px rgba(0, 255, 136, 0.3);
+        }
+        .fab.hidden {
+            transform: scale(0) rotate(180deg);
+            opacity: 0;
+        }
+
+        /* Gesture area overlay for swipe detection */
+        .gesture-area {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 50;
+            touch-action: pan-y;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Drawer -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
+    <div class="drawer" id="drawer">
+        <div class="drawer-header">
+            <h2>⚡ Arafat Pro</h2>
+            <p>Web Terminal v2.0</p>
+        </div>
+        
+        <div class="drawer-section">
+            <h3>Session</h3>
+            <button class="drawer-btn" onclick="sendCtrl('L'); toggleDrawer();">
+                <span class="icon">🧹</span> Clear Screen
+            </button>
+            <button class="drawer-btn" onclick="sendCtrl('D'); toggleDrawer();">
+                <span class="icon">🏃</span> Exit Session
+            </button>
+            <button class="drawer-btn" onclick="sendString('reset\n'); toggleDrawer();">
+                <span class="icon">🔄</span> Reset Terminal
+            </button>
+        </div>
+
+        <div class="drawer-section">
+            <h3>Quick Commands</h3>
+            <button class="drawer-btn" onclick="sendString('ls -la\n'); toggleDrawer();">
+                <span class="icon">📁</span> List Files
+            </button>
+            <button class="drawer-btn" onclick="sendString('pwd\n'); toggleDrawer();">
+                <span class="icon">📍</span> Current Path
+            </button>
+            <button class="drawer-btn" onclick="sendString('whoami\n'); toggleDrawer();">
+                <span class="icon">👤</span> Who Am I
+            </button>
+            <button class="drawer-btn" onclick="sendString('htop\n'); toggleDrawer();">
+                <span class="icon">📊</span> System Monitor
+            </button>
+            <button class="drawer-btn" onclick="sendString('neofetch\n'); toggleDrawer();">
+                <span class="icon">🖥️</span> System Info
+            </button>
+        </div>
+
+        <div class="drawer-section">
+            <h3>Theme</h3>
+            <div class="theme-grid">
+                <button class="theme-btn active" onclick="setTheme('hacker')">💚 Hacker</button>
+                <button class="theme-btn" onclick="setTheme('ocean')">🌊 Ocean</button>
+                <button class="theme-btn" onclick="setTheme('amber')">📺 Amber</button>
+                <button class="theme-btn" onclick="setTheme('dracula')">🧛 Dracula</button>
+            </div>
+        </div>
+
+        <div class="drawer-section">
+            <h3>Settings</h3>
+            <button class="drawer-btn" onclick="toggleFullscreen(); toggleDrawer();">
+                <span class="icon">🔳</span> Fullscreen
+            </button>
+            <button class="drawer-btn" onclick="toggleFab(); toggleDrawer();">
+                <span class="icon">📋</span> Toggle Paste Button
+            </button>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="hamburger" onclick="toggleDrawer()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <span id="sessionInfo">bash</span>
+        </div>
+        <div class="status-right">
+            <span id="clock">--:--</span>
+            <div class="status-indicator"></div>
+        </div>
+    </div>
+
+    <!-- Terminal -->
+    <div id="terminal">
+        <div class="gesture-area" id="gestureArea"></div>
+    </div>
+
+    <!-- Floating Paste Button -->
+    <button class="fab" id="fab" onclick="doPaste()">📋</button>
+
+    <!-- Keyboard Interface -->
+    <div class="keyboard-container" id="keyboardContainer">
+        <div class="swipe-hint">← Swipe tabs for more keys →</div>
+        
+        <div class="kb-tabs">
+            <button class="kb-tab active" onclick="switchTab(0)">Main</button>
+            <button class="kb-tab" onclick="switchTab(1)">Ctrl</button>
+            <button class="kb-tab" onclick="switchTab(2)">Nav</button>
+            <button class="kb-tab" onclick="switchTab(3)">Sym</button>
+            <button class="kb-tab" onclick="switchTab(4)">Func</button>
+        </div>
+
+        <!-- Main Keys -->
+        <div class="kb-panel active" id="panel-0">
+            <button class="key special" onclick="sendChar('\x1b')">ESC</button>
+            <button class="key mod" onclick="sendCtrl('C')">CTRL+C</button>
+            <button class="key mod" onclick="sendCtrl('Z')">CTRL+Z</button>
+            <button class="key mod" onclick="sendCtrl('D')">CTRL+D</button>
+            <button class="key mod" onclick="sendCtrl('A')">CTRL+A</button>
+            <button class="key mod" onclick="sendCtrl('E')">CTRL+E</button>
+            <button class="key" onclick="sendChar('\t')">TAB</button>
+            <button class="key" onclick="sendChar('~')">~</button>
+            <button class="key" onclick="sendChar('/')">/</button>
+            <button class="key" onclick="sendChar('-')">-</button>
+            <button class="key" onclick="sendChar('_')">_</button>
+            <button class="key" onclick="sendChar('.')">.</button>
+            <button class="key wide special" onclick="sendChar('\n')">ENTER ↵</button>
+            <button class="key wide danger" onclick="sendChar('\x7f')">BACK ⌫</button>
+        </div>
+
+        <!-- Ctrl Keys -->
+        <div class="kb-panel" id="panel-1">
+            <button class="key mod" onclick="sendCtrl('A')">^A</button>
+            <button class="key mod" onclick="sendCtrl('B')">^B</button>
+            <button class="key mod" onclick="sendCtrl('C')">^C</button>
+            <button class="key mod" onclick="sendCtrl('D')">^D</button>
+            <button class="key mod" onclick="sendCtrl('E')">^E</button>
+            <button class="key mod" onclick="sendCtrl('F')">^F</button>
+            <button class="key mod" onclick="sendCtrl('G')">^G</button>
+            <button class="key mod" onclick="sendCtrl('H')">^H</button>
+            <button class="key mod" onclick="sendCtrl('I')">^I</button>
+            <button class="key mod" onclick="sendCtrl('J')">^J</button>
+            <button class="key mod" onclick="sendCtrl('K')">^K</button>
+            <button class="key mod" onclick="sendCtrl('L')">^L</button>
+            <button class="key mod" onclick="sendCtrl('M')">^M</button>
+            <button class="key mod" onclick="sendCtrl('N')">^N</button>
+            <button class="key mod" onclick="sendCtrl('O')">^O</button>
+            <button class="key mod" onclick="sendCtrl('P')">^P</button>
+            <button class="key mod" onclick="sendCtrl('Q')">^Q</button>
+            <button class="key mod" onclick="sendCtrl('R')">^R</button>
+            <button class="key mod" onclick="sendCtrl('S')">^S</button>
+            <button class="key mod" onclick="sendCtrl('T')">^T</button>
+            <button class="key mod" onclick="sendCtrl('U')">^U</button>
+            <button class="key mod" onclick="sendCtrl('V')">^V</button>
+            <button class="key mod" onclick="sendCtrl('W')">^W</button>
+            <button class="key mod" onclick="sendCtrl('X')">^X</button>
+            <button class="key mod" onclick="sendCtrl('Y')">^Y</button>
+            <button class="key mod" onclick="sendCtrl('Z')">^Z</button>
+        </div>
+
+        <!-- Navigation -->
+        <div class="kb-panel" id="panel-2">
+            <button class="key wide" onclick="sendChar('\x1b[H')">HOME</button>
+            <button class="key wide" onclick="sendChar('\x1b[F')">END</button>
+            <button class="key wide" onclick="sendChar('\x1b[5~')">PG UP</button>
+            <button class="key wide" onclick="sendChar('\x1b[6~')">PG DN</button>
+            <button class="key wide" onclick="sendChar('\x1b[2~')">INS</button>
+            <button class="key wide" onclick="sendChar('\x1b[3~')">DEL</button>
+            <button class="key xl special" onclick="sendChar('\x1b[A')">↑ UP</button>
+            <button class="key wide" onclick="sendChar('\x1b[D')">← LEFT</button>
+            <button class="key wide" onclick="sendChar('\x1b[C')">RIGHT →</button>
+            <button class="key xl special" onclick="sendChar('\x1b[B')">↓ DOWN</button>
+        </div>
+
+        <!-- Symbols -->
+        <div class="kb-panel" id="panel-3">
+            <button class="key" onclick="sendChar('|')">|</button>
+            <button class="key" onclick="sendChar('&')">&</button>
+            <button class="key" onclick="sendChar(';')">;</button>
+            <button class="key" onclick="sendChar('>')">></button>
+            <button class="key" onclick="sendChar('<')"><</button>
+            <button class="key" onclick="sendChar('*')">*</button>
+            <button class="key" onclick="sendChar('?')">?</button>
+            <button class="key" onclick="sendChar('$')">$</button>
+            <button class="key" onclick="sendChar('#')">#</button>
+            <button class="key" onclick="sendChar('@')">@</button>
+            <button class="key" onclick="sendChar('!')">!</button>
+            <button class="key" onclick="sendChar('%')">%</button>
+            <button class="key" onclick="sendChar('^')">^</button>
+            <button class="key" onclick="sendChar('(')">(</button>
+            <button class="key" onclick="sendChar(')')">)</button>
+            <button class="key" onclick="sendChar('{')">{</button>
+            <button class="key" onclick="sendChar('}')">}</button>
+            <button class="key" onclick="sendChar('[')">[</button>
+            <button class="key" onclick="sendChar(']')">]</button>
+            <button class="key" onclick="sendChar('=')">=</button>
+            <button class="key" onclick="sendChar('+')">+</button>
+            <button class="key" onclick="sendChar('\\')">\</button>
+            <button class="key" onclick="sendChar('`')">`</button>
+            <button class="key" onclick="sendChar('"')">"</button>
+            <button class="key" onclick="sendChar('\'')">'</button>
+            <button class="key wide special" onclick="sendString(' | ')"> | </button>
+            <button class="key wide special" onclick="sendString(' && ')"> && </button>
+            <button class="key wide special" onclick="sendString(' || ')"> || </button>
+            <button class="key wide special" onclick="sendString(' >> ')"> >> </button>
+        </div>
+
+        <!-- Functions -->
+        <div class="kb-panel" id="panel-4">
+            <button class="key wide" onclick="sendChar('\x1bOP')">F1</button>
+            <button class="key wide" onclick="sendChar('\x1bOQ')">F2</button>
+            <button class="key wide" onclick="sendChar('\x1bOR')">F3</button>
+            <button class="key wide" onclick="sendChar('\x1bOS')">F4</button>
+            <button class="key wide" onclick="sendChar('\x1b[15~')">F5</button>
+            <button class="key wide" onclick="sendChar('\x1b[17~')">F6</button>
+            <button class="key wide" onclick="sendChar('\x1b[18~')">F7</button>
+            <button class="key wide" onclick="sendChar('\x1b[19~')">F8</button>
+            <button class="key wide" onclick="sendChar('\x1b[20~')">F9</button>
+            <button class="key wide" onclick="sendChar('\x1b[21~')">F10</button>
+            <button class="key wide" onclick="sendChar('\x1b[23~')">F11</button>
+            <button class="key wide" onclick="sendChar('\x1b[24~')">F12</button>
+            <button class="key wide special" onclick="doPaste()">📋 PASTE</button>
+            <button class="key wide special" onclick="sendString('clear\n')">CLEAR</button>
+            <button class="key wide danger" onclick="sendCtrl('C')">BREAK</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="client-bundle.js"></script>
+    <script>
+        // ============================================
+        // ARAFAT PRO TERMINAL - Advanced Controller
+        // ============================================
+
+        // Global state
+        let currentTab = 0;
+        let fabVisible = true;
+        let term = null;
+        let socket = null;
+
+        // Wait for ttyd to initialize
+        window.addEventListener('load', function() {
+            initTerminalBridge();
+            startClock();
+            initGestures();
+            
+            // Show welcome toast
+            setTimeout(() => showToast('⚡ Arafat Pro Terminal Ready'), 1000);
+        });
+
+        // Bridge to ttyd's xterm instance
+        function initTerminalBridge() {
+            // ttyd creates window.term and uses xterm-addon-fit
+            // We hook into the existing terminal after a short delay
+            setTimeout(() => {
+                if (window.term) {
+                    term = window.term;
+                    console.log('[ArafatPro] Terminal bridge established');
+                    
+                    // Focus terminal on click
+                    document.getElementById('terminal').addEventListener('click', () => {
+                        if (term && term.focus) term.focus();
+                    });
+                } else {
+                    console.warn('[ArafatPro] Waiting for ttyd terminal...');
+                    // Retry
+                    setTimeout(initTerminalBridge, 500);
+                }
+            }, 1000);
+        }
+
+        // Core input functions
+        function sendChar(char) {
+            if (!char) return;
+            
+            // Method 1: Direct xterm input (most reliable)
+            if (term && term.input) {
+                term.input(char);
+            }
+            // Method 2: Custom event for ttyd
+            const event = new CustomEvent('ttyd-input', { detail: char });
+            window.dispatchEvent(event);
+            
+            // Method 3: Direct websocket if available
+            if (window.ttyd && window.ttyd.socket) {
+                const msg = JSON.stringify({ data: char });
+                window.ttyd.socket.send(msg);
+            }
+            
+            // Visual feedback
+            vibrate(15);
+        }
+
+        function sendCtrl(key) {
+            const code = String.fromCharCode(key.charCodeAt(0) - 64);
+            sendChar(code);
+            showToast(`Sent Ctrl+${key}`);
+        }
+
+        function sendString(str) {
+            for (let i = 0; i < str.length; i++) {
+                setTimeout(() => sendChar(str[i]), i * 10);
+            }
+        }
+
+        // Clipboard
+        async function doPaste() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    sendString(text);
+                    showToast(`📋 Pasted ${text.length} chars`);
+                }
+            } catch (err) {
+                console.error('Paste failed:', err);
+                // Fallback: prompt
+                const text = prompt("Paste your text here:");
+                if (text) sendString(text);
+            }
+        }
+
+        // UI Functions
+        function toggleDrawer() {
+            document.getElementById('drawer').classList.toggle('active');
+            document.getElementById('drawerOverlay').classList.toggle('active');
+            vibrate(20);
+        }
+
+        function switchTab(index) {
+            // Update tabs
+            document.querySelectorAll('.kb-tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            // Update panels
+            document.querySelectorAll('.kb-panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            currentTab = index;
+            vibrate(10);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function vibrate(ms) {
+            if (navigator.vibrate) navigator.vibrate(ms);
+        }
+
+        // Clock
+        function startClock() {
+            const update = () => {
+                const now = new Date();
+                document.getElementById('clock').textContent = 
+                    now.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: false 
+                    });
+            };
+            update();
+            setInterval(update, 1000);
+        }
+
+        // Themes
+        const themes = {
+            hacker: { neon: '#00ff88', bg: '#0a0a0a', panel: '#111111' },
+            ocean:  { neon: '#00ccff', bg: '#001122', panel: '#001a2e' },
+            amber:  { neon: '#ffb000', bg: '#1a0f00', panel: '#2a1a00' },
+            dracula:{ neon: '#bd93f9', bg: '#282a36', panel: '#44475a' }
+        };
+
+        function setTheme(name) {
+            const t = themes[name];
+            if (!t) return;
+            
+            const root = document.documentElement;
+            root.style.setProperty('--neon', t.neon);
+            root.style.setProperty('--bg', t.bg);
+            root.style.setProperty('--panel', t.panel);
+            
+            // Update active state
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.toLowerCase().includes(name)) btn.classList.add('active');
+            });
+            
+            showToast(`🎨 Theme: ${name.toUpperCase()}`);
+            
+            // Persist
+            localStorage.setItem('arafat-theme', name);
+        }
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('arafat-theme');
+        if (savedTheme && themes[savedTheme]) {
+            setTheme(savedTheme);
+        }
+
+        // Fullscreen
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // FAB Toggle
+        function toggleFab() {
+            fabVisible = !fabVisible;
+            document.getElementById('fab').classList.toggle('hidden', !fabVisible);
+        }
+
+        // Gesture Controls (Swipe on terminal)
+        function initGestures() {
+            const area = document.getElementById('gestureArea');
+            let startX = 0, startY = 0;
+            let startTime = 0;
+
+            area.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                startTime = Date.now();
+            }, { passive: true });
+
+            area.addEventListener('touchend', (e) => {
+                const dx = e.changedTouches[0].clientX - startX;
+                const dy = e.changedTouches[0].clientY - startY;
+                const dt = Date.now() - startTime;
+                
+                // Only process quick swipes
+                if (dt > 500) return;
+                
+                const absX = Math.abs(dx);
+                const absY = Math.abs(dy);
+                
+                if (absX > 80 && absX > absY) {
+                    // Horizontal swipe - switch keyboard tabs
+                    if (dx > 0) {
+                        // Right swipe - next tab
+                        const next = (currentTab + 1) % 5;
+                        switchTab(next);
+                        showToast(`Tab: ${document.querySelectorAll('.kb-tab')[next].textContent}`);
+                    } else {
+                        // Left swipe - prev tab
+                        const prev = (currentTab - 1 + 5) % 5;
+                        switchTab(prev);
+                        showToast(`Tab: ${document.querySelectorAll('.kb-tab')[prev].textContent}`);
+                    }
+                } else if (absY > 100 && absY > absX) {
+                    // Vertical swipe
+                    if (dy < 0) {
+                        // Up - show keyboard
+                        document.getElementById('keyboardContainer').style.display = 'block';
+                        showToast('⌨️ Keyboard shown');
+                    } else {
+                        // Down - hide keyboard
+                        document.getElementById('keyboardContainer').style.display = 'none';
+                        showToast('⌨️ Keyboard hidden');
+                    }
+                }
+            }, { passive: true });
+
+            // Double tap to paste
+            let lastTap = 0;
+            area.addEventListener('touchend', (e) => {
+                const now = Date.now();
+                if (now - lastTap < 300) {
+                    doPaste();
+                }
+                lastTap = now;
+            }, { passive: true });
+        }
+
+        // Keyboard shortcuts for desktop
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+Shift+V to paste
+            if (e.ctrlKey && e.shiftKey && e.key === 'V') {
+                e.preventDefault();
+                doPaste();
+            }
+            // Ctrl+B to toggle drawer
+            if (e.ctrlKey && e.key === 'b') {
+                e.preventDefault();
+                toggleDrawer();
+            }
+        });
+
+        // Prevent zoom on double tap for buttons
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                btn.click();
+            }, { passive: false });
+        });
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && term) {
+                term.focus();
+            }
+        });
+    </script>
+</body>
+                                                                </html>
