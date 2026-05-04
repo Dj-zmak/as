@@ -2,46 +2,33 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install all packages
+# Install System Tools
 RUN apt-get update && apt-get install -y \
-    bash \
-    curl \
-    wget \
-    procps \
-    nano \
-    vim \
-    htop \
-    neofetch \
-    git \
     python3 \
     python3-pip \
-    sudo \
-    openssh-server \
-    net-tools \
-    iputils-ping \
-    dnsutils \
+    nano \
+    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs
 
-# Install ttyd
-RUN wget -qO /usr/local/bin/ttyd https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64 \
-    && chmod +x /usr/local/bin/ttyd
+# Install PM2
+RUN npm install pm2 -g
 
 WORKDIR /app
 
-# Copy all files
+# Copy project files
 COPY package.json .
-COPY server.js .
-COPY index.html .
-
-# Install npm dependencies
 RUN npm install
 
-# Expose port
-EXPOSE 3000
+COPY . .
 
-# Start command
+# Railway Port
+ENV PORT=8080
+EXPOSE 8080
+
+# Start server
 CMD ["node", "server.js"]
