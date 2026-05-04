@@ -10,20 +10,25 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 8080;
 
-// Terminal setup
-const shell = 'bash';
+app.use(express.static(path.join(__dirname, 'public')));
 
 io.on('connection', (socket) => {
-    const ptyProcess = pty.spawn(shell, [], {
-        name: 'xterm-color',
+    // সরাসরি bash ওপেন হবে root হিসেবে
+    const ptyProcess = pty.spawn('bash', [], {
+        name: 'xterm-256color',
         cols: 80,
         rows: 30,
-        cwd: process.cwd(),
+        cwd: '/app',
         env: process.env
     });
 
     socket.on('input', (data) => {
         ptyProcess.write(data);
+    });
+
+    // টার্মিনাল উইন্ডো রিসাইজ হ্যান্ডলার (যাতে টেক্সট না কাটে)
+    socket.on('resize', (size) => {
+        ptyProcess.resize(size.cols, size.rows);
     });
 
     ptyProcess.onData((data) => {
@@ -35,11 +40,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// Serve frontend (Create an index.html in the same folder)
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`VPS Terminal running on port ${PORT}`);
 });
