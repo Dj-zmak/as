@@ -1,25 +1,23 @@
 FROM ubuntu:22.04
 
+# এনভায়রনমেন্ট সেটআপ
 ENV DEBIAN_FRONTEND=noninteractive
 
-# প্রয়োজনীয় প্যাকেজ ইনস্টল
+# প্রয়োজনীয় টুলস ইনস্টল (Node.js, Python, Build Tools)
 RUN apt-get update && apt-get install -y \
-    curl openssh-server python3 nodejs npm neofetch git \
-    && npm install -g pm2 \
-    && curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared \
-    && chmod +x /usr/local/bin/cloudflared \
+    curl nodejs npm python3 build-essential neofetch git sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# SSH কনফিগারেশন (User: root, Pass: Arafat)
-RUN mkdir /var/run/sshd && \
-    echo 'root:Arafat' | chpasswd && \
-    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-
 WORKDIR /app
+
+# প্যাকেজ ইনস্টল
+COPY package.json ./
+RUN npm install
+
+# প্রজেক্ট ফাইল কপি
 COPY . .
-RUN npm install express
 
-EXPOSE 8080 22
+EXPOSE 8080
 
-# স্টার্টআপ স্ক্রিপ্ট
-CMD service ssh start && node server.js
+# ব্যাকগ্রাউন্ড প্রসেস ম্যানেজমেন্ট
+CMD ["node", "server.js"]
