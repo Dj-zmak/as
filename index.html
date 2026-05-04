@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Arafat Pro Termux</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css" />
+    <style>
+        :root { --neon: #00ff88; --bg: #000000; }
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); overflow: hidden; font-family: 'Courier New', monospace; }
+        
+        #terminal-container { height: calc(100% - 60px); width: 100%; }
+
+        /* Termux Style Toolbar */
+        .toolbar {
+            height: 60px; background: #111; display: flex; 
+            align-items: center; justify-content: center; gap: 5px;
+            border-top: 1px solid #333; padding: 0 5px;
+        }
+
+        .t-btn {
+            background: #222; color: var(--neon); border: 1px solid #444;
+            padding: 10px 8px; border-radius: 5px; font-size: 11px;
+            font-weight: bold; flex: 1; text-align: center;
+        }
+
+        .t-btn:active { background: var(--neon); color: #000; }
+        
+        /* Paste Button Special Style */
+        .paste-btn { border-color: var(--neon); box-shadow: 0 0 5px var(--neon); }
+    </style>
+</head>
+<body>
+
+    <div id="terminal-container"></div>
+    
+    <div class="toolbar">
+        <button class="t-btn" onclick="sendCtrl('C')">ESC</button>
+        <button class="t-btn" onclick="sendCtrl('C')">CTRL+C</button>
+        <button class="t-btn" onclick="sendKey('\t')">TAB</button>
+        <button class="t-btn" onclick="sendKey('/')">/</button>
+        <button class="t-btn" onclick="sendKey('-')">-</button>
+        <button class="t-btn paste-btn" onclick="pasteClipboard()">PASTE</button>
+        <button class="t-btn" onclick="sendKey('\x1b[A')">UP</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        const socket = io();
+        const term = new Terminal({
+            cursorBlink: true,
+            theme: { background: '#000000', foreground: '#00ff88' },
+            fontSize: 13,
+            convertEol: true, // কোড পেস্ট বাগ ফিক্স
+            scrollback: 1000,
+            allowProposedApi: true
+        });
+
+        const fitAddon = new TerminalAddonFit.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal-container'));
+        
+        // কিবোর্ড ওপেন হলে স্ক্রিন অ্যাডজাস্ট করা
+        setTimeout(() => fitAddon.fit(), 500);
+
+        term.onData(data => socket.emit('input', data));
+        socket.on('output', data => term.write(data));
+
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+            socket.emit('resize', { cols: term.cols, rows: term.rows });
+        });
+
+        function sendKey(key) { socket.emit('input', key); term.focus(); }
+        function sendCtrl(key) { 
+            const code = key.charCodeAt(0) - 64; 
+            socket.emit('input', String.fromCharCode(code)); 
+            term.focus(); 
+        }
+
+        async function pasteClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                socket.emit('input', text);
+            } catch (err) {
+                alert("Paste permission required!");
+            }
+            term.focus();
+        }
+    </script>
+</body>
+</html>
