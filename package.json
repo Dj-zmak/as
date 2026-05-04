@@ -1,8 +1,10 @@
 {
-  "name": "arafat-vps-proxy",
-  "version": "1.0.0",
+  "name": "arafat-termux-pro",
+  "version": "2.0.0",
   "main": "server.js",
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1",
+    "node-pty": "^1.1.0"
   }
 }
