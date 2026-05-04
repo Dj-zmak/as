@@ -1,60 +1,45 @@
 const express = require('express');
-const path = require('path');
-const { spawn } = require('child_process');
 const http = require('http');
-const WebSocket = require('ws');
-const pty = require('node-pty');
-const os = require('os');
+const { exec } = require('child_process');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Main route - serve your HTML
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// WebSocket terminal handling
-wss.on('connection', (ws) => {
-    console.log('New terminal connection');
-    
-    const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
-    
-    const ptyProcess = pty.spawn(shell, [], {
-        name: 'xterm-color',
-        cols: 80,
-        rows: 24,
-        cwd: process.env.HOME || '/',
-        env: process.env
-    });
-
-    ptyProcess.on('data', (data) => {
-        try {
-            ws.send(data);
-        } catch (e) {
-            console.error('Send error:', e);
-        }
-    });
-
-    ws.on('message', (msg) => {
-        try {
-            ptyProcess.write(msg);
-        } catch (e) {
-            console.error('Write error:', e);
-        }
-    });
-
-    ws.on('close', () => {
-        ptyProcess.kill();
-        console.log('Terminal connection closed');
-    });
-});
 
 const PORT = process.env.PORT || 3000;
+
+// Start ttyd in background
+exec('ttyd -p 7681 -W -c terminal:terminal bash', (err, stdout, stderr) => {
+    if (err) {
+        console.error('ttyd start error:', err);
+        return;
+    }
+    console.log('[TTYD] Started on port 7681');
+});
+
+// Serve static files
+app.use(express.static(path.join(__dirname)));
+
+// Main route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        server: 'Ubuntu 22.04',
+        terminal: 'ttyd',
+        time: new Date().toISOString()
+    });
+});
+
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Arafat Pro Terminal running on port ${PORT}`);
+    console.log('========================================');
+    console.log('  ⚡ Arafat Pro Terminal');
+    console.log('  🐧 Ubuntu 22.04');
+    console.log(`  🌐 Web Server: http://0.0.0.0:${PORT}`);
+    console.log(`  💻 Terminal:   ws://0.0.0.0:7681`);
+    console.log('========================================');
 });
