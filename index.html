@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { background: #000; margin: 0; padding: 10px; overflow: hidden; }
+        #terminal { height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="terminal"></div>
+    <script>
+        const socket = io();
+        const term = new Terminal({
+            cursorBlink: true,
+            fontSize: 14,
+            theme: { background: '#1a1a1a' },
+            convertEol: true
+        });
+        term.open(document.getElementById('terminal'));
+
+        term.onData(data => socket.emit('input', data));
+        socket.on('output', data => term.write(data));
+
+        // Handle window resize
+        window.addEventListener('resize', () => term.refresh(0, term.rows - 1));
+    </script>
+</body>
+</html>
