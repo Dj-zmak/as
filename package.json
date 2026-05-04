@@ -1,8 +1,7 @@
-
 {
   "name": "arafat-pro-terminal",
-  "version": "2.0.0",
-  "description": "Advanced Web Terminal with Termux-style UI",
+  "version": "1.0.0",
+  "description": "Arafat Pro Web Terminal with Virtual Keyboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,7 +9,11 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "ws": "^8.14.2"
+    "ws": "^8.16.0",
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=18.0.0"
