@@ -1,45 +1,45 @@
 const express = require('express');
 const http = require('http');
-const { exec } = require('child_process');
+const { Server } = require('socket.io');
+const pty = require('node-pty');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
-// Start ttyd in background
-exec('ttyd -p 7681 -W -c terminal:terminal bash', (err, stdout, stderr) => {
-    if (err) {
-        console.error('ttyd start error:', err);
-        return;
-    }
-    console.log('[TTYD] Started on port 7681');
+// Terminal setup
+const shell = 'bash';
+
+io.on('connection', (socket) => {
+    const ptyProcess = pty.spawn(shell, [], {
+        name: 'xterm-color',
+        cols: 80,
+        rows: 30,
+        cwd: process.cwd(),
+        env: process.env
+    });
+
+    socket.on('input', (data) => {
+        ptyProcess.write(data);
+    });
+
+    ptyProcess.onData((data) => {
+        socket.emit('output', data);
+    });
+
+    socket.on('disconnect', () => {
+        ptyProcess.kill();
+    });
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname)));
-
-// Main route
+// Serve frontend (Create an index.html in the same folder)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'ok', 
-        server: 'Ubuntu 22.04',
-        terminal: 'ttyd',
-        time: new Date().toISOString()
-    });
-});
-
-server.listen(PORT, '0.0.0.0', () => {
-    console.log('========================================');
-    console.log('  ⚡ Arafat Pro Terminal');
-    console.log('  🐧 Ubuntu 22.04');
-    console.log(`  🌐 Web Server: http://0.0.0.0:${PORT}`);
-    console.log(`  💻 Terminal:   ws://0.0.0.0:7681`);
-    console.log('========================================');
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
