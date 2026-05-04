@@ -1,31 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { background: #000; margin: 0; padding: 10px; overflow: hidden; }
-        #terminal { height: 100vh; }
+        body, html { margin: 0; padding: 0; height: 100%; background: #000; }
+        #terminal-container { width: 100vw; height: 100vh; }
     </style>
 </head>
 <body>
-    <div id="terminal"></div>
+    <div id="terminal-container"></div>
     <script>
         const socket = io();
         const term = new Terminal({
             cursorBlink: true,
             fontSize: 14,
-            theme: { background: '#1a1a1a' },
-            convertEol: true
+            fontFamily: 'monospace',
+            theme: { background: '#000000' }
         });
-        term.open(document.getElementById('terminal'));
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal-container'));
+        fitAddon.fit();
 
+        // কিবোর্ড ডেটা পাঠানো
         term.onData(data => socket.emit('input', data));
         socket.on('output', data => term.write(data));
 
-        // Handle window resize
-        window.addEventListener('resize', () => term.refresh(0, term.rows - 1));
+        // ফোনের স্ক্রিন অনুযায়ী রিসাইজ
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+            socket.emit('resize', { cols: term.cols, rows: term.rows });
+        });
+
+        // অটো-রিসাইজ কল
+        setTimeout(() => {
+            fitAddon.fit();
+            socket.emit('resize', { cols: term.cols, rows: term.rows });
+        }, 500);
     </script>
 </body>
 </html>
